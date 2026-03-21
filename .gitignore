@@ -12,3 +12,6 @@ count.txt
 .vinxi
 __unconfig*
 todos.json
+.agents
+.claude
+skills-lock.json
