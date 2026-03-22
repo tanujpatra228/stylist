@@ -35,18 +35,34 @@ User {
 
 StyleProfile {
   _id, userId (ref),
-  gender, ageRange, bodyType,
-  stylePreferences: [String],     // e.g. ["minimalist", "streetwear", "classic"]
-  colorPreferences: [String],
-  avoidColors: [String],
-  lifestyle: String,              // e.g. "corporate", "casual", "creative"
-  climate: String,                // e.g. "tropical", "temperate", "cold"
-  budget: String,                 // e.g. "budget", "mid-range", "luxury"
-  questionnaire: [{               // raw Q&A history
-    question: String,
-    answer: String,
-    askedAt: Date
+  traits: Object,                 // AI-extracted structured data, shape evolves per user:
+                                  // e.g. { gender, bodyType, lifestyle, climate, budget,
+                                  //   styleIdentity: ["minimalist", "streetwear"],
+                                  //   colorPreferences: [...], avoidColors: [...],
+                                  //   occasions: [...], inspirations: [...] }
+                                  // NOT a fixed schema — AI decides what to extract
+  summary: String,                // AI-generated natural language summary of the user's style
+  createdAt, updatedAt
+}
+
+StylistSession {
+  _id, userId (ref),
+  type: String,                   // "onboarding" | "detailed" | "profile-edit" | "wardrobe-review"
+  status: String,                 // "active" | "completed" | "abandoned"
+  messages: [{
+    role: String,                 // "stylist" | "user"
+    content: String,              // The text message
+    images: [String],             // URLs of images shown (by stylist) or sent (by user)
+    uiHints: {                    // How to render the stylist's message — see Phase 3
+      inputType: String,          // "text" | "single-select" | "multi-select" | "image-grid" | "color-picker" | "slider" | "free-text"
+      options: [{ label, value, imageUrl? }],
+      min: Number, max: Number,   // for slider
+      placeholder: String
+    },
+    extractedData: Object,        // What the AI extracted from this exchange (partial traits)
+    timestamp: Date
   }],
+  profileSnapshotBefore: Object,  // StyleProfile.traits at session start (for diff)
   createdAt, updatedAt
 }
 
@@ -124,12 +140,14 @@ Outfit {
 - [ ] Create Mongoose models in `src/server/models/`:
   - `user.model.ts`
   - `style-profile.model.ts`
+  - `stylist-session.model.ts`
   - `wardrobe-item.model.ts`
   - `outfit.model.ts`
 - [ ] Define MongoDB indexes on models:
   - `WardrobeItem`: compound index on `{ userId, category }`, index on `{ userId, tags }`, index on `{ userId, season }` — these power the wardrobe grid filters
   - `Outfit`: index on `{ userId, occasion }`, index on `{ userId, createdAt }`
   - `StyleProfile`: unique index on `{ userId }`
+  - `StylistSession`: index on `{ userId, status }`, index on `{ userId, createdAt }`
 - [ ] Create Zod schemas in `src/shared/schemas/` that mirror the models (used for validation on both client and server)
 - [ ] Test DB connection via a simple server function
 
@@ -144,7 +162,7 @@ src/
 │   ├── layout/          # Shell, Sidebar, Navbar, Footer
 │   ├── wardrobe/        # Wardrobe-specific components
 │   ├── outfits/         # Outfit-specific components
-│   ├── onboarding/      # Questionnaire components
+│   ├── stylist/         # AI stylist conversation UI + dynamic input renderers
 │   └── common/          # Shared components (ImageUpload, Rating, etc.)
 ├── hooks/               # Custom React hooks
 ├── lib/                 # Client utilities
@@ -214,7 +232,33 @@ interface AIVisionProvider {
   analyzeWardrobeItem(image: ImageInput): Promise<ItemAnalysisResult>
 }
 
+// What the AI stylist returns for each conversational turn
+interface StylistTurnResponse {
+  message: string                 // The stylist's text response
+  images?: string[]               // Optional reference images to show
+  uiHints: {                      // How the frontend should render the input
+    inputType: "text" | "single-select" | "multi-select" | "image-grid"
+                | "color-picker" | "slider" | "free-text"
+    options?: { label: string; value: string; imageUrl?: string }[]
+    min?: number; max?: number    // for slider
+    placeholder?: string
+  }
+  extractedData?: Record<string, unknown>  // Structured data extracted from user's PREVIOUS answer
+  sessionComplete?: boolean       // true when AI decides it has enough info
+  updatedSummary?: string         // Updated natural language style summary
+}
+
 interface AITextProvider {
+  // Conversational stylist — drives the onboarding and profile sessions
+  stylistConverse(context: {
+    sessionType: "onboarding" | "detailed" | "profile-edit" | "wardrobe-review"
+    conversationHistory: { role: string; content: string; images?: string[] }[]
+    currentProfile: Record<string, unknown> | null   // existing traits, null if new user
+    wardrobeItems?: WardrobeItemSummary[]             // for detailed/wardrobe-review sessions
+    turnCount: number                                  // how many exchanges so far
+    maxTurns: number                                   // session budget (e.g. 7 for onboarding)
+  }): Promise<StylistTurnResponse>
+
   generateOutfitSuggestions(
     wardrobeItems: WardrobeItemSummary[],
     styleProfile: StyleProfileSummary,
@@ -267,6 +311,7 @@ export function getAIProvider(): AIProvider {
 > **Why singleton?** Each provider initializes an SDK client. Creating a new instance per request wastes connections and memory. Cache it once.
 
 - [ ] Create `src/server/ai/prompts/` — store prompt templates separately from provider logic:
+  - `stylist-conversation.ts` — the system prompt for the AI stylist persona + instructions for each session type (onboarding, detailed, profile-edit, wardrobe-review). This is the most important prompt in the app.
   - `item-analysis.ts` — the system/user prompt for wardrobe item recognition
   - `outfit-suggestion.ts` — the prompt for generating outfit pairings
   - `style-advice.ts` — the prompt for general style Q&A
@@ -447,48 +492,179 @@ Create the route files (empty placeholder components for now):
 - [ ] `src/routes/_authenticated/outfits/$outfitId.tsx`
 - [ ] `src/routes/_authenticated/profile.tsx`
 - [ ] `src/routes/_authenticated/settings.tsx`
-- [ ] `src/routes/_authenticated/onboarding.tsx`
+- [ ] `src/routes/_authenticated/onboarding.tsx` (full-screen stylist conversation — built in Phase 3)
 
 ### 2.3 — Dashboard Page (Basic)
 
 - [ ] Show welcome message with user's name
-- [ ] Show stats cards: total items, total outfits, profile completion %
-- [ ] "Quick actions" section: Upload item, Get outfit suggestion, Complete profile
+- [ ] Show stats cards: total items, total outfits, style summary preview
+- [ ] "Quick actions" section: Upload item, Get outfit suggestion, Chat with stylist
+- [ ] Prompt for detailed stylist session when user has 5+ wardrobe items but hasn't done one yet (see Phase 3.5)
 - [ ] This page will be enhanced later — keep it simple for now
 
 ---
 
-## Phase 3 — Onboarding & Style Profile
+## Phase 3 — AI Stylist Conversations & Style Profile
 
-**Goal:** Collect the user's style preferences through an interactive questionnaire.
+**Goal:** An AI stylist has a natural conversation with each user to understand their style. No hardcoded forms — every user gets a different, personalized experience.
 
-### 3.1 — Questionnaire Flow
+### How It Works
 
-- [ ] Install shadcn: `radio-group`, `checkbox`, `select`, `progress`, `slider`, `badge`
-- [ ] Design the questionnaire as a multi-step wizard (5–8 steps):
-  1. **Basics** — gender, age range, body type
-  2. **Lifestyle** — work environment, daily routine, social activities
-  3. **Style Identity** — show image grids, user picks styles they like (minimalist, bohemian, streetwear, classic, etc.)
-  4. **Color Preferences** — favorite colors, colors to avoid (visual color picker grid)
-  5. **Occasions** — what do they dress for most? (work, casual, dates, events)
-  6. **Climate** — where they live, seasonal considerations
-  7. **Budget** — spending range per item
-  8. **Inspirations** — optional free text about style icons or brands they like
-- [ ] Create `src/components/onboarding/questionnaire-wizard.tsx` — multi-step form container with progress bar
-- [ ] Create individual step components in `src/components/onboarding/steps/`
+The AI stylist drives the conversation. Each turn, the AI decides:
+1. **What to ask** — based on what it already knows (or doesn't) about the user
+2. **How to ask it** — returns `uiHints` telling the frontend which input component to render (image grid, color picker, multi-select, free text, slider, etc.)
+3. **What to extract** — after each user response, the AI extracts structured data and merges it into the user's `StyleProfile.traits`
+4. **When to stop** — the AI decides when it has enough info, within the session's turn budget
 
-### 3.2 — Server Functions & Persistence
+```
+┌─────────────┐      ┌──────────────────┐      ┌─────────────┐
+│   Frontend   │ ──→  │  Server Function  │ ──→  │  AI Provider │
+│  (renders    │      │  (manages session │      │  (generates  │
+│   uiHints)   │ ←──  │   + profile)      │ ←──  │   next turn) │
+└─────────────┘      └──────────────────┘      └─────────────┘
+       │                      │
+       │  user response       │  save to DB:
+       │  (text/selection/    │  - StylistSession.messages
+       │   image)             │  - StyleProfile.traits (merge extractedData)
+```
 
-- [ ] Create server function `saveStyleProfile` — saves/updates the StyleProfile document
-- [ ] Create server function `getStyleProfile` — fetches the current user's profile
-- [ ] Wire up the wizard to save progress on each step (so users can resume)
-- [ ] Mark `onboardingComplete: true` on User when wizard finishes
+### Session Types
 
-### 3.3 — Profile View & Edit
+| Type              | When                                          | Turn Budget | Context Passed to AI                         |
+| ----------------- | --------------------------------------------- | ----------- | -------------------------------------------- |
+| `onboarding`      | First time after signup                        | 5–7 turns   | Empty profile                                |
+| `detailed`        | Prompted after user uploads 5+ wardrobe items  | 10–15 turns | Existing profile + wardrobe item summaries   |
+| `profile-edit`    | User clicks "Chat with stylist" on profile     | 5–10 turns  | Full existing profile                        |
+| `wardrobe-review` | User requests wardrobe feedback                | 5–10 turns  | Full profile + all wardrobe items            |
 
-- [ ] Create `src/routes/_authenticated/profile.tsx` — displays saved style profile
-- [ ] Allow editing individual sections without re-doing the whole wizard
-- [ ] Show a "retake questionnaire" option
+### 3.1 — Stylist Conversation Engine (Backend)
+
+- [ ] Create Mongoose model for `StylistSession` (see Data Models above)
+- [ ] Create Zod schemas: `StylistTurnResponseSchema`, `StylistSessionSchema`
+- [ ] Implement `stylistConverse` in `GeminiProvider`:
+  - Uses prompt template from `src/server/ai/prompts/stylist-conversation.ts`
+  - Receives full conversation history + current profile + session metadata
+  - Returns `StylistTurnResponse` (message, uiHints, extractedData, images, sessionComplete)
+  - **Critical:** The prompt must instruct the AI to:
+    - Act as a warm, knowledgeable personal stylist
+    - Ask one focused question per turn (not multiple)
+    - Choose the right `inputType` for each question (don't use free-text when a color picker is better)
+    - Extract structured data from each user response
+    - Adapt questions based on previous answers (if user says "I work from home", don't ask about office dress code)
+    - Wrap up gracefully when approaching the turn limit
+    - On the final turn, generate a `updatedSummary` of the user's style
+- [ ] Create `src/server/services/stylist.service.ts` — business logic:
+  - `startSession(userId, type)`: creates a new StylistSession, snapshots current profile, calls AI for the first question
+  - `respondToStylist(sessionId, userResponse)`:
+    1. Append user message to session
+    2. Call `getAIProvider().stylistConverse(...)` with full context
+    3. Merge `extractedData` into `StyleProfile.traits` (deep merge, not replace)
+    4. Append stylist message to session
+    5. If `sessionComplete`, mark session as completed + update `StyleProfile.summary`
+    6. Return the `StylistTurnResponse` to the frontend
+  - `resumeSession(sessionId)`: return the latest session state (for page refreshes)
+  - `getSessionHistory(userId)`: list past sessions for context
+- [ ] Create server functions in `src/server/functions/stylist.ts`:
+  - `startStylistSession`
+  - `sendStylistMessage`
+  - `resumeStylistSession`
+
+### 3.2 — Stylist Conversation Prompt
+
+This is the most important prompt in the app. Create `src/server/ai/prompts/stylist-conversation.ts`:
+
+- [ ] Write the system prompt — key elements:
+  ```
+  You are a personal stylist having a 1-on-1 conversation with a client.
+  Your goal is to understand their unique style, personality, and lifestyle
+  so you can later help them build outfits from their wardrobe.
+
+  RULES:
+  - Ask ONE question per turn. Be conversational, warm, not clinical.
+  - Pick the best inputType for each question (see available types).
+  - After each user response, extract any style-relevant data into extractedData.
+  - Adapt to the user. If they mention specifics, dig deeper. If they're vague, offer options.
+  - For onboarding: cover basics (style vibe, lifestyle, colors, climate, occasions) in 5-7 turns.
+  - For detailed sessions: go deeper — reference their actual wardrobe items, ask about gaps, seasonal needs.
+  - When showing images: use descriptive URLs that the frontend will map to style references.
+  - On your final turn: set sessionComplete=true and write a natural updatedSummary.
+
+  AVAILABLE INPUT TYPES:
+  - "single-select": one option from a list (use for clear choices)
+  - "multi-select": multiple options (use for preferences like "pick all styles you like")
+  - "image-grid": grid of images user can pick from (use for visual style identity)
+  - "color-picker": color palette grid (use for color preferences)
+  - "slider": numeric range (use for budget, formality level, etc.)
+  - "free-text": open text input (use sparingly — for inspirations, specific requests)
+  - "text": no input needed, just a statement/transition from the stylist
+
+  RESPONSE FORMAT: JSON matching StylistTurnResponse interface.
+  ```
+- [ ] Include session-type-specific instructions (onboarding vs detailed vs profile-edit vs wardrobe-review)
+- [ ] Include few-shot examples of good conversation turns
+- [ ] Test and iterate heavily — the quality of this prompt IS the product
+
+### 3.3 — Stylist Conversation UI
+
+- [ ] Install shadcn: `radio-group`, `checkbox`, `select`, `progress`, `slider`, `badge`, `scroll-area`, `avatar`
+- [ ] Create `src/components/stylist/stylist-chat.tsx` — the main conversation container:
+  - Scrollable message list (stylist messages on left with avatar, user responses on right)
+  - Stylist messages show text + optional reference images
+  - Bottom area renders the dynamic input component based on `uiHints.inputType`
+  - Progress indicator showing turn count (e.g. "3 of 7")
+  - Typing indicator while waiting for AI response
+- [ ] Create dynamic input renderers in `src/components/stylist/inputs/`:
+  - `single-select-input.tsx` — styled card buttons
+  - `multi-select-input.tsx` — checkboxes / toggleable badges
+  - `image-grid-input.tsx` — clickable image cards (single or multi select)
+  - `color-picker-input.tsx` — visual color palette grid
+  - `slider-input.tsx` — labeled slider with min/max
+  - `free-text-input.tsx` — text input with send button
+- [ ] Create `src/components/stylist/stylist-message.tsx` — renders a single stylist message (text + images)
+- [ ] Create `src/components/stylist/user-message.tsx` — renders user's response
+
+### 3.4 — Onboarding Flow
+
+- [ ] Create `src/routes/_authenticated/onboarding.tsx`:
+  - Full-screen stylist conversation (no sidebar distractions)
+  - Starts a `type: "onboarding"` session automatically
+  - On completion: shows summary card of what the AI learned, "Looks great!" confirm button
+  - Sets `onboardingComplete: true` on user
+  - Redirects to dashboard
+- [ ] Add redirect: if `onboardingComplete === false`, send user to `/onboarding` from any authenticated route
+
+### 3.5 — Detailed Session (Post-Wardrobe)
+
+- [ ] After user uploads 5+ wardrobe items, show a prompt on the dashboard:
+  > "Now that I can see your wardrobe, I'd love to learn more about your style. Ready for a deeper chat?"
+- [ ] Starts a `type: "detailed"` session with wardrobe item summaries passed to the AI
+  - The AI can reference specific items: "I see you have a lot of earth tones — is that intentional?"
+  - Longer budget (10–15 turns) for a more thorough conversation
+- [ ] On completion: merge new extracted data into existing profile traits (deep merge, not replace)
+
+### 3.6 — Profile View & Edit via Stylist
+
+- [ ] Create `src/routes/_authenticated/profile.tsx`:
+  - Display the AI-generated style summary (natural language, not a form)
+  - Display extracted traits as visual tags/badges (colors, styles, occasions, etc.)
+  - **"Chat with your stylist"** button — starts a `type: "profile-edit"` session
+    - AI sees the current profile and asks what's changed or if anything feels wrong
+    - Merges updates into existing traits
+  - Show past session history (collapsible, for reference)
+- [ ] No manual form editing — all profile changes happen through stylist conversations
+  > This is intentional. The AI extracts better data through conversation than users would enter into forms. It also makes the product feel premium and differentiated.
+
+### 3.7 — AI Memory Across Sessions
+
+- [ ] When starting any new session, pass to the AI:
+  - Current `StyleProfile.traits` (what we know)
+  - Current `StyleProfile.summary` (natural language context)
+  - Summary of past sessions (not full transcripts — just key takeaways)
+- [ ] The `extractedData` from each turn is **merged** into `StyleProfile.traits`:
+  - New keys are added
+  - Existing keys are updated if the AI signals a change (e.g. user moved to a new city → climate changes)
+  - The AI should include a `_overwrites` field in `extractedData` when intentionally changing a previous value, so the service layer knows it's not a mistake
+- [ ] After each completed session, regenerate `StyleProfile.summary` from the full traits
 
 ---
 
