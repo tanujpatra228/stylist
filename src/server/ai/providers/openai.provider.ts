@@ -8,7 +8,7 @@ import type {
   StylistTurnResponse,
 } from "../types"
 
-const MODEL = "gpt-4o-mini"
+const MODEL = "gpt-5-nano"
 
 export class OpenAIProvider implements AIProvider {
   private client: OpenAI
@@ -50,8 +50,7 @@ export class OpenAIProvider implements AIProvider {
       model: MODEL,
       messages,
       response_format: { type: "json_object" },
-      temperature: 0.8,
-      max_tokens: 4096,
+      max_completion_tokens: 4096,
     })
 
     const text = response.choices[0]?.message?.content ?? ""
@@ -94,6 +93,6 @@ export class OpenAIProvider implements AIProvider {
   }
 
   async analyzeWardrobeItem(_image: ImageInput): Promise<ItemAnalysisResult> {
-    throw new Error("analyzeWardrobeItem not implemented — coming in Phase 4")
+    throw new Error("analyzeWardrobeItem not implemented  - coming in Phase 4")
   }
 }

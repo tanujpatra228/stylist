@@ -1,6 +1,7 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef } from "react"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { Sparkles, ArrowLeft } from "lucide-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -38,7 +39,12 @@ function OnboardingPage() {
 
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [currentUiHints, setCurrentUiHints] = useState<UiHints | undefined>()
+  const [currentUiHints, setCurrentUiHints] = useState<UiHints | undefined>(undefined)
+  const lastUiHintsRef = useRef<UiHints | undefined>(undefined)
+  function updateUiHints(hints: UiHints | undefined) {
+    if (hints) lastUiHintsRef.current = hints
+    setCurrentUiHints(hints)
+  }
   const [turnCount, setTurnCount] = useState(0)
   const [maxTurns, setMaxTurns] = useState(7)
   const [isLoading, setIsLoading] = useState(false)
@@ -59,7 +65,7 @@ function OnboardingPage() {
       setMessages([
         { role: "stylist", content: result.turnResponse.message },
       ])
-      setCurrentUiHints(result.turnResponse.uiHints)
+      updateUiHints(result.turnResponse.uiHints)
     } catch (error: unknown) {
       const err = error as Error
       console.error("Failed to start session:", err.message || err)
@@ -74,7 +80,7 @@ function OnboardingPage() {
 
       // Optimistically add user message
       setMessages((prev) => [...prev, { role: "user", content: message }])
-      setCurrentUiHints(undefined)
+      updateUiHints(undefined)
       setIsLoading(true)
 
       try {
@@ -86,14 +92,19 @@ function OnboardingPage() {
           ...prev,
           { role: "stylist", content: result.turnResponse.message },
         ])
-        setCurrentUiHints(result.turnResponse.uiHints)
+        updateUiHints(result.turnResponse.uiHints)
 
         if (result.isComplete) {
           setIsComplete(true)
           setSummary(result.turnResponse.updatedSummary || null)
         }
-      } catch (error) {
-        console.error("Failed to send message:", error)
+      } catch (error: unknown) {
+        const err = error as Error
+        console.error("Failed to send message:", err.message || err)
+        toast.error("Couldn't reach the AI stylist. Please try again.")
+        // Remove the optimistic user message so they can retry
+        setMessages((prev) => prev.slice(0, -1))
+        updateUiHints(lastUiHintsRef.current)
       }
       setIsLoading(false)
     },
@@ -104,25 +115,73 @@ function OnboardingPage() {
   if (!hasStarted) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md text-center">
-          <CardHeader>
-            <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-primary/10">
-              <Sparkles className="size-8 text-primary" />
+        <div className="w-full max-w-md space-y-6">
+          {/* Stylist avatar + intro */}
+          <div className="flex flex-col items-center text-center">
+            <div className="mb-4 flex size-20 items-center justify-center rounded-full bg-primary/10">
+              <Sparkles className="size-10 text-primary" />
             </div>
-            <CardTitle className="text-2xl">Meet Your AI Stylist</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              I&apos;ll ask you a few quick questions to understand your style,
-              lifestyle, and preferences. This takes about 2 minutes.
+            <h1 className="text-2xl font-semibold">
+              Hi, I&apos;m your AI Stylist
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              Think of me as your personal style consultant.
             </p>
-          </CardContent>
-          <CardFooter className="flex-col gap-2">
-            <Button onClick={handleStart} className="w-full" size="lg">
-              Let&apos;s get started
-            </Button>
-          </CardFooter>
-        </Card>
+          </div>
+
+          {/* What to expect */}
+          <Card>
+            <CardContent className="space-y-4 pt-6">
+              <p className="text-sm leading-relaxed">
+                Before I can help you build amazing outfits, I need to
+                understand <strong>you</strong>  - your style, your lifestyle,
+                and what makes you feel confident.
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                    1
+                  </span>
+                  <p className="text-sm text-muted-foreground">
+                    I&apos;ll ask a few quick questions about your style
+                    preferences, daily routine, and colors you love.
+                  </p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                    2
+                  </span>
+                  <p className="text-sm text-muted-foreground">
+                    From your answers, I&apos;ll build a personalized style
+                    profile unique to you.
+                  </p>
+                </div>
+                <div className="flex items-start gap-3">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                    3
+                  </span>
+                  <p className="text-sm text-muted-foreground">
+                    Later, I&apos;ll use this profile to suggest outfits from
+                    your wardrobe that truly match your style.
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This takes about 2 minutes. You can always update your profile
+                later.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Button
+            onClick={handleStart}
+            className="w-full"
+            size="lg"
+            disabled={isLoading}
+          >
+            {isLoading ? "Starting..." : "Let\u2019s get started"}
+          </Button>
+        </div>
       </div>
     )
   }

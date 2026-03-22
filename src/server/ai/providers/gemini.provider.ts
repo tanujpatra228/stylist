@@ -34,7 +34,7 @@ export class GeminiProvider implements AIProvider {
     // Add context about current profile and turn info as a user message prefix
     const contextMessage = this.buildContextMessage(context)
     if (contents.length === 0) {
-      // First turn — send context as user message to kick off the conversation
+      // First turn  - send context as user message to kick off the conversation
       contents.push({
         role: "user",
         parts: [{ text: contextMessage }],
@@ -90,6 +90,6 @@ export class GeminiProvider implements AIProvider {
   }
 
   async analyzeWardrobeItem(_image: ImageInput): Promise<ItemAnalysisResult> {
-    throw new Error("analyzeWardrobeItem not implemented — coming in Phase 4")
+    throw new Error("analyzeWardrobeItem not implemented  - coming in Phase 4")
   }
 }

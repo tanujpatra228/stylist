@@ -3,8 +3,24 @@ import { StyleProfile } from "../models/style-profile.model"
 import { StylistSession } from "../models/stylist-session.model"
 import { getAIProvider } from "../ai/provider"
 import { stylistTurnResponseSchema } from "@/shared/schemas/ai.schema"
-import type { SessionType, ConversationMessage } from "../ai/types"
+import type {
+  SessionType,
+  ConversationMessage,
+  StylistTurnResponse,
+} from "../ai/types"
 import type { IStylistMessage } from "../models/stylist-session.model"
+
+function sanitizeResponse(response: StylistTurnResponse) {
+  const clean = (s: string) => s.replaceAll("\u2014", "-").replaceAll("\u2013", "-")
+  return {
+    ...response,
+    message: clean(response.message),
+    extractedData: response.extractedData as Record<string, string> | undefined,
+    updatedSummary: response.updatedSummary
+      ? clean(response.updatedSummary)
+      : undefined,
+  }
+}
 
 const MAX_TURNS: Record<SessionType, number> = {
   onboarding: 7,
@@ -41,7 +57,7 @@ export async function startSession(userId: string, type: SessionType) {
   })
 
   // Validate response
-  const validated = stylistTurnResponseSchema.parse(aiResponse)
+  const validated = sanitizeResponse(stylistTurnResponseSchema.parse(aiResponse))
 
   // Save AI message to session
   session.messages.push({
@@ -106,7 +122,7 @@ export async function respondToStylist(
     maxTurns,
   })
 
-  const validated = stylistTurnResponseSchema.parse(aiResponse)
+  const validated = sanitizeResponse(stylistTurnResponseSchema.parse(aiResponse))
 
   // Merge extracted data into profile
   if (validated.extractedData && profile) {

@@ -56,7 +56,7 @@ export function StylistChat({
         </span>
       </div>
 
-      {/* Messages — min-h-0 is critical for flex children to enable scrolling */}
+      {/* Messages  - min-h-0 is critical for flex children to enable scrolling */}
       <div
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-y-auto p-4"
@@ -83,7 +83,7 @@ export function StylistChat({
         </div>
       </div>
 
-      {/* Input area — pinned to bottom */}
+      {/* Input area  - pinned to bottom */}
       {!isComplete && !isLoading && currentUiHints && (
         <div className="shrink-0 border-t bg-background p-4">
           <div className="mx-auto max-w-2xl">
@@ -175,7 +175,7 @@ function DynamicInput({
         />
       )
     case "text":
-      // No input needed — just a statement from the stylist
+      // No input needed  - just a statement from the stylist
       return null
     default:
       return (
