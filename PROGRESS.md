@@ -11,7 +11,7 @@
 | 0     | Project Setup & Foundation  | Partial        |
 | 1     | Authentication              | Done (no OAuth) |
 | 2     | App Shell & Navigation      | Done           |
-| 3     | Stylist Onboarding          | Not Started    |
+| 3     | Stylist Onboarding          | Done (core)    |
 | 4     | Outfit Suggestions & Premium| Not Started    |
 
 ---
@@ -101,8 +101,49 @@
 - [x] Stats cards (wardrobe items, outfits, style profile — hardcoded zeros)
 - [x] Quick actions (upload item, get outfit suggestion, chat with stylist)
 
-## Phase 3 — Stylist Onboarding
-> Not started. See ROADMAP.md for details.
+## Phase 3 — AI Stylist Conversations & Style Profile
+
+### 0.4 — AI Adapter Layer (prerequisite)
+- [x] Create `src/server/ai/types.ts` — AI provider interfaces
+- [x] Create `src/server/ai/provider.ts` — provider factory (singleton)
+- [x] Create `src/server/ai/providers/gemini.provider.ts` — Gemini implementation (`@google/genai`)
+- [x] Create `src/server/ai/prompts/stylist-conversation.ts` — stylist system prompt
+
+### 3.1 — Stylist Conversation Engine (Backend)
+- [x] Create `src/server/models/connect-mongoose.ts` — Mongoose connection
+- [x] Create `src/server/models/style-profile.model.ts` — StyleProfile model
+- [x] Create `src/server/models/stylist-session.model.ts` — StylistSession model
+- [x] Create `src/shared/schemas/ai.schema.ts` — Zod schemas for AI responses
+- [x] Create `src/server/services/stylist.service.ts` — session + profile business logic
+- [x] Create `src/server/functions/stylist.ts` — server functions
+
+### 3.2 — Stylist Conversation Prompt
+- [x] System prompt with session-type-specific instructions
+- [x] Available input types guidance
+- [x] Few-shot examples
+- [ ] Test and iterate on prompt quality — _ongoing_
+
+### 3.3 — Stylist Conversation UI
+- [x] Install shadcn components (`progress`, `badge`, `scroll-area`, `slider`, `checkbox`, `radio-group`)
+- [x] Create `src/components/stylist/stylist-chat.tsx` — chat container
+- [x] Create 6 dynamic input renderers (single-select, multi-select, free-text, slider, color-picker, image-grid)
+- [x] Create `src/components/stylist/stylist-message.tsx` + `user-message.tsx`
+
+### 3.4 — Onboarding Flow
+- [x] Update `src/routes/_authenticated/onboarding.tsx` — full-screen conversation
+- [x] Add onboarding redirect in `_authenticated.tsx`
+- [ ] End-to-end onboarding flow verified — _needs browser testing_
+
+### 3.5 — Detailed Session (Post-Wardrobe)
+- [ ] Deferred — needs wardrobe items (Phase 4)
+
+### 3.6 — Profile View & Edit
+- [x] Update `src/routes/_authenticated/profile.tsx` — style summary + trait badges
+- [ ] "Chat with stylist" for profile edits — _basic link to onboarding for now_
+
+### 3.7 — AI Memory Across Sessions
+- [x] Basic: pass current profile as context to AI
+- [ ] Full implementation deferred — needs multiple sessions to test
 
 ## Phase 4 — Outfit Suggestions & Premium
 > Not started. See ROADMAP.md for details.
@@ -122,3 +163,7 @@
 | 2026-03-22 | Nitro `serverDir: "./server"` must be set in vite.config.ts for server routes to be picked up |
 | 2026-03-22 | DB connection uses lazy init (not top-level await) to avoid breaking Vite's client bundle |
 | 2026-03-22 | Mobile-first approach for all frontend — most users on mobile devices |
+| 2026-03-22 | Using `@google/genai` (new SDK) instead of deprecated `@google/generative-ai` |
+| 2026-03-22 | Gemini model: `gemini-2.5-flash` for conversational turns (best price/performance) |
+| 2026-03-22 | Onboarding is full-screen (no sidebar) — focused conversation experience |
+| 2026-03-22 | Mongoose + native MongoDB driver coexist on same Atlas cluster |
