@@ -9,8 +9,8 @@
 | Phase | Name                        | Status         |
 | ----- | --------------------------- | -------------- |
 | 0     | Project Setup & Foundation  | Partial        |
-| 1     | Authentication              | Done (no OAuth)|
-| 2     | App Shell & Navigation      | Not Started    |
+| 1     | Authentication              | Done (no OAuth) |
+| 2     | App Shell & Navigation      | Done           |
 | 3     | Stylist Onboarding          | Not Started    |
 | 4     | Outfit Suggestions & Premium| Not Started    |
 
@@ -80,7 +80,26 @@
 ---
 
 ## Phase 2 — App Shell & Navigation
-> Not started. See ROADMAP.md for details.
+
+### 2.1 — Layout Components
+- [x] Install shadcn components (`sidebar`, `avatar`, `dropdown-menu`, `sheet`, `tooltip`)
+- [x] Create `src/components/layout/app-sidebar.tsx` — collapsible sidebar with nav links
+- [x] Create `src/components/layout/app-header.tsx` — top bar with user avatar dropdown
+- [x] Create `src/components/layout/app-shell.tsx` — combines sidebar + header + content
+
+### 2.2 — Route Structure
+- [x] `src/routes/_authenticated/wardrobe/index.tsx` — placeholder
+- [x] `src/routes/_authenticated/wardrobe/$itemId.tsx` — placeholder
+- [x] `src/routes/_authenticated/outfits/index.tsx` — placeholder
+- [x] `src/routes/_authenticated/outfits/$outfitId.tsx` — placeholder
+- [x] `src/routes/_authenticated/profile.tsx` — placeholder
+- [x] `src/routes/_authenticated/settings.tsx` — placeholder
+- [x] `src/routes/_authenticated/onboarding.tsx` — placeholder
+
+### 2.3 — Dashboard Page (Basic)
+- [x] Welcome message with user name
+- [x] Stats cards (wardrobe items, outfits, style profile — hardcoded zeros)
+- [x] Quick actions (upload item, get outfit suggestion, chat with stylist)
 
 ## Phase 3 — Stylist Onboarding
 > Not started. See ROADMAP.md for details.
@@ -102,3 +121,4 @@
 | 2026-03-22 | Better Auth needs native `mongodb` driver, not Mongoose — both coexist pointing at same Atlas cluster |
 | 2026-03-22 | Nitro `serverDir: "./server"` must be set in vite.config.ts for server routes to be picked up |
 | 2026-03-22 | DB connection uses lazy init (not top-level await) to avoid breaking Vite's client bundle |
+| 2026-03-22 | Mobile-first approach for all frontend — most users on mobile devices |

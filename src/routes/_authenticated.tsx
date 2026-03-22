@@ -1,5 +1,6 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router"
+import { createFileRoute, redirect } from "@tanstack/react-router"
 import { getSession } from "@/server/auth.functions"
+import { AppShell } from "@/components/layout/app-shell"
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
@@ -16,5 +17,6 @@ export const Route = createFileRoute("/_authenticated")({
 })
 
 function AuthenticatedLayout() {
-  return <Outlet />
+  const { user } = Route.useRouteContext()
+  return <AppShell user={user} />
 }

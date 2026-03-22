@@ -15,7 +15,14 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PublicSignupRouteImport } from './routes/_public/signup'
 import { Route as PublicLoginRouteImport } from './routes/_public/login'
 import { Route as PublicForgotPasswordRouteImport } from './routes/_public/forgot-password'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedWardrobeIndexRouteImport } from './routes/_authenticated/wardrobe/index'
+import { Route as AuthenticatedOutfitsIndexRouteImport } from './routes/_authenticated/outfits/index'
+import { Route as AuthenticatedWardrobeItemIdRouteImport } from './routes/_authenticated/wardrobe/$itemId'
+import { Route as AuthenticatedOutfitsOutfitIdRouteImport } from './routes/_authenticated/outfits/$outfitId'
 
 const PublicRoute = PublicRouteImport.update({
   id: '/_public',
@@ -45,25 +52,78 @@ const PublicForgotPasswordRoute = PublicForgotPasswordRouteImport.update({
   path: '/forgot-password',
   getParentRoute: () => PublicRoute,
 } as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedWardrobeIndexRoute =
+  AuthenticatedWardrobeIndexRouteImport.update({
+    id: '/wardrobe/',
+    path: '/wardrobe/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedOutfitsIndexRoute =
+  AuthenticatedOutfitsIndexRouteImport.update({
+    id: '/outfits/',
+    path: '/outfits/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedWardrobeItemIdRoute =
+  AuthenticatedWardrobeItemIdRouteImport.update({
+    id: '/wardrobe/$itemId',
+    path: '/wardrobe/$itemId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedOutfitsOutfitIdRoute =
+  AuthenticatedOutfitsOutfitIdRouteImport.update({
+    id: '/outfits/$outfitId',
+    path: '/outfits/$outfitId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/profile': typeof AuthenticatedProfileRoute
+  '/settings': typeof AuthenticatedSettingsRoute
   '/forgot-password': typeof PublicForgotPasswordRoute
   '/login': typeof PublicLoginRoute
   '/signup': typeof PublicSignupRoute
+  '/outfits/$outfitId': typeof AuthenticatedOutfitsOutfitIdRoute
+  '/wardrobe/$itemId': typeof AuthenticatedWardrobeItemIdRoute
+  '/outfits/': typeof AuthenticatedOutfitsIndexRoute
+  '/wardrobe/': typeof AuthenticatedWardrobeIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/profile': typeof AuthenticatedProfileRoute
+  '/settings': typeof AuthenticatedSettingsRoute
   '/forgot-password': typeof PublicForgotPasswordRoute
   '/login': typeof PublicLoginRoute
   '/signup': typeof PublicSignupRoute
+  '/outfits/$outfitId': typeof AuthenticatedOutfitsOutfitIdRoute
+  '/wardrobe/$itemId': typeof AuthenticatedWardrobeItemIdRoute
+  '/outfits': typeof AuthenticatedOutfitsIndexRoute
+  '/wardrobe': typeof AuthenticatedWardrobeIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,24 +131,62 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/_public': typeof PublicRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
+  '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_public/forgot-password': typeof PublicForgotPasswordRoute
   '/_public/login': typeof PublicLoginRoute
   '/_public/signup': typeof PublicSignupRoute
+  '/_authenticated/outfits/$outfitId': typeof AuthenticatedOutfitsOutfitIdRoute
+  '/_authenticated/wardrobe/$itemId': typeof AuthenticatedWardrobeItemIdRoute
+  '/_authenticated/outfits/': typeof AuthenticatedOutfitsIndexRoute
+  '/_authenticated/wardrobe/': typeof AuthenticatedWardrobeIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/forgot-password' | '/login' | '/signup'
+  fullPaths:
+    | '/'
+    | '/dashboard'
+    | '/onboarding'
+    | '/profile'
+    | '/settings'
+    | '/forgot-password'
+    | '/login'
+    | '/signup'
+    | '/outfits/$outfitId'
+    | '/wardrobe/$itemId'
+    | '/outfits/'
+    | '/wardrobe/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/forgot-password' | '/login' | '/signup'
+  to:
+    | '/'
+    | '/dashboard'
+    | '/onboarding'
+    | '/profile'
+    | '/settings'
+    | '/forgot-password'
+    | '/login'
+    | '/signup'
+    | '/outfits/$outfitId'
+    | '/wardrobe/$itemId'
+    | '/outfits'
+    | '/wardrobe'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/_public'
     | '/_authenticated/dashboard'
+    | '/_authenticated/onboarding'
+    | '/_authenticated/profile'
+    | '/_authenticated/settings'
     | '/_public/forgot-password'
     | '/_public/login'
     | '/_public/signup'
+    | '/_authenticated/outfits/$outfitId'
+    | '/_authenticated/wardrobe/$itemId'
+    | '/_authenticated/outfits/'
+    | '/_authenticated/wardrobe/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -141,6 +239,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PublicForgotPasswordRouteImport
       parentRoute: typeof PublicRoute
     }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/profile': {
+      id: '/_authenticated/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AuthenticatedProfileRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/onboarding': {
+      id: '/_authenticated/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -148,15 +267,57 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/wardrobe/': {
+      id: '/_authenticated/wardrobe/'
+      path: '/wardrobe'
+      fullPath: '/wardrobe/'
+      preLoaderRoute: typeof AuthenticatedWardrobeIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/outfits/': {
+      id: '/_authenticated/outfits/'
+      path: '/outfits'
+      fullPath: '/outfits/'
+      preLoaderRoute: typeof AuthenticatedOutfitsIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/wardrobe/$itemId': {
+      id: '/_authenticated/wardrobe/$itemId'
+      path: '/wardrobe/$itemId'
+      fullPath: '/wardrobe/$itemId'
+      preLoaderRoute: typeof AuthenticatedWardrobeItemIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/outfits/$outfitId': {
+      id: '/_authenticated/outfits/$outfitId'
+      path: '/outfits/$outfitId'
+      fullPath: '/outfits/$outfitId'
+      preLoaderRoute: typeof AuthenticatedOutfitsOutfitIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
+  AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedOutfitsOutfitIdRoute: typeof AuthenticatedOutfitsOutfitIdRoute
+  AuthenticatedWardrobeItemIdRoute: typeof AuthenticatedWardrobeItemIdRoute
+  AuthenticatedOutfitsIndexRoute: typeof AuthenticatedOutfitsIndexRoute
+  AuthenticatedWardrobeIndexRoute: typeof AuthenticatedWardrobeIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
+  AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedOutfitsOutfitIdRoute: AuthenticatedOutfitsOutfitIdRoute,
+  AuthenticatedWardrobeItemIdRoute: AuthenticatedWardrobeItemIdRoute,
+  AuthenticatedOutfitsIndexRoute: AuthenticatedOutfitsIndexRoute,
+  AuthenticatedWardrobeIndexRoute: AuthenticatedWardrobeIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
