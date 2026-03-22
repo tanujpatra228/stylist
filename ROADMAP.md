@@ -14,10 +14,8 @@
 | UI               | shadcn/ui + Tailwind CSS v4                                 |
 | Database         | MongoDB Atlas (via Mongoose ODM)                            |
 | Authentication   | Better Auth (email/password + OAuth)                        |
-| File Storage     | Cloudinary (image upload, transformation, CDN)              |
-| AI               | Adapter pattern — Claude API default, swappable to OpenAI/Gemini/etc. |
-| Payments         | Stripe (subscriptions)                                      |
-| Email            | Resend (transactional emails)                               |
+| File Storage     | Adapter pattern — Cloudinary default, swappable to S3/Supabase Storage/etc. |
+| AI               | Adapter pattern — Gemini API default, swappable to Claude/OpenAI/etc. |
 | Deployment       | Vercel or Railway                                           |
 | Validation       | Zod (shared client/server schemas)                          |
 
@@ -28,9 +26,11 @@
 ```
 User {
   _id, email, name, avatarUrl,
-  subscription: { plan, stripeCustomerId, status },
   onboardingComplete: Boolean,
   createdAt, updatedAt
+  // NOTE: Better Auth manages its own user/session/account collections.
+  // This model extends Better Auth's user with app-specific fields.
+  // Do NOT duplicate auth fields — link via Better Auth's userId.
 }
 
 StyleProfile {
@@ -52,8 +52,9 @@ StyleProfile {
 
 WardrobeItem {
   _id, userId (ref),
-  imageUrl: String,               // Cloudinary URL
-  thumbnailUrl: String,           // Cloudinary transformed
+  imageUrl: String,               // Public URL from storage provider
+  thumbnailUrl: String,           // Transformed/resized URL from storage provider
+  storageKey: String,             // Provider-specific key (for delete/transform operations)
   category: String,               // "tops", "bottoms", "footwear", "accessories", "outerwear", "dresses"
   subcategory: String,            // "t-shirt", "jeans", "sneakers", etc.
   colors: [String],               // detected dominant colors
@@ -94,24 +95,28 @@ Outfit {
 - [ ] Remove Supabase credentials from `.env`, add MongoDB connection string
 - [ ] Create `.env.example` with all required env vars (no values):
   ```
-  MONGODB_URI=
+  MONGO_URI=
   BETTER_AUTH_SECRET=
+  BETTER_AUTH_URL=http://localhost:3000
+  STORAGE_PROVIDER=cloudinary
   CLOUDINARY_CLOUD_NAME=
   CLOUDINARY_API_KEY=
   CLOUDINARY_API_SECRET=
-  AI_PROVIDER=claude
-  CLAUDE_API_KEY=
-  # OPENAI_API_KEY=          # uncomment when using openai provider
-  # GEMINI_API_KEY=           # uncomment when using gemini provider
-  STRIPE_SECRET_KEY=
-  STRIPE_WEBHOOK_SECRET=
-  RESEND_API_KEY=
+  # AWS_S3_BUCKET=              # uncomment when using s3 provider
+  # AWS_S3_REGION=
+  # AWS_ACCESS_KEY_ID=
+  # AWS_SECRET_ACCESS_KEY=
+  AI_PROVIDER=gemini
+  GEMINI_API_KEY=
+  # CLAUDE_API_KEY=           # uncomment when using claude provider
+  # OPENAI_API_KEY=           # uncomment when using openai provider
   ```
 - [ ] Set up MongoDB Atlas free tier cluster
 - [ ] Install core dependencies:
   ```bash
-  npm install mongoose zod @tanstack/react-query better-auth
+  npm install mongoose zod better-auth
   ```
+  > Note: TanStack Start uses `loader` + `serverFn` patterns for data fetching — you likely won't need `@tanstack/react-query` separately. The existing `@tanstack/react-router-ssr-query` handles SSR data bridging.
 
 ### 0.2 — Database Connection
 
@@ -121,6 +126,10 @@ Outfit {
   - `style-profile.model.ts`
   - `wardrobe-item.model.ts`
   - `outfit.model.ts`
+- [ ] Define MongoDB indexes on models:
+  - `WardrobeItem`: compound index on `{ userId, category }`, index on `{ userId, tags }`, index on `{ userId, season }` — these power the wardrobe grid filters
+  - `Outfit`: index on `{ userId, occasion }`, index on `{ userId, createdAt }`
+  - `StyleProfile`: unique index on `{ userId }`
 - [ ] Create Zod schemas in `src/shared/schemas/` that mirror the models (used for validation on both client and server)
 - [ ] Test DB connection via a simple server function
 
@@ -141,14 +150,21 @@ src/
 ├── lib/                 # Client utilities
 ├── server/
 │   ├── models/          # Mongoose models
-│   ├── ai/              # AI adapter layer (see below)
+│   ├── ai/              # AI adapter layer (see Phase 0.4)
 │   │   ├── types.ts             # Interfaces: AIProvider, AIVisionProvider
 │   │   ├── provider.ts          # Factory: getAIProvider()
 │   │   ├── prompts/             # Prompt templates (item-analysis.ts, outfit-suggestion.ts)
 │   │   └── providers/
-│   │       ├── claude.provider.ts
-│   │       ├── openai.provider.ts   # (add when needed)
-│   │       └── gemini.provider.ts   # (add when needed)
+│   │       ├── gemini.provider.ts
+│   │       ├── claude.provider.ts   # (add when needed)
+│   │       └── openai.provider.ts   # (add when needed)
+│   ├── storage/          # Storage adapter layer (see Phase 0.5)
+│   │   ├── types.ts             # Interface: StorageProvider
+│   │   ├── provider.ts          # Factory: getStorageProvider()
+│   │   └── providers/
+│   │       ├── cloudinary.provider.ts
+│   │       ├── s3.provider.ts       # (add when needed)
+│   │       └── supabase.provider.ts # (add when needed)
 │   ├── services/        # Business logic (wardrobe.service, outfit.service, etc.)
 │   ├── functions/       # TanStack server functions (API layer)
 │   └── db.ts            # DB connection
@@ -191,8 +207,11 @@ interface OutfitSuggestion {
   reasoning: string
 }
 
+// Image input can be a public URL or raw bytes — providers handle conversion internally
+type ImageInput = { url: string } | { buffer: Buffer; mimeType: string }
+
 interface AIVisionProvider {
-  analyzeWardrobeItem(imageUrl: string): Promise<ItemAnalysisResult>
+  analyzeWardrobeItem(image: ImageInput): Promise<ItemAnalysisResult>
 }
 
 interface AITextProvider {
@@ -212,44 +231,154 @@ interface AITextProvider {
 interface AIProvider extends AIVisionProvider, AITextProvider {}
 ```
 
-- [ ] Create `src/server/ai/providers/claude.provider.ts` — implements `AIProvider` using `@anthropic-ai/sdk`
-- [ ] Create `src/server/ai/provider.ts` — factory that reads `AI_PROVIDER` env var and returns the correct provider:
+- [ ] Create `src/server/ai/providers/gemini.provider.ts` — implements `AIProvider` using `@google/generative-ai`
+- [ ] Create `src/server/ai/provider.ts` — singleton factory that reads `AI_PROVIDER` env var and returns the correct provider:
 
 ```typescript
 // provider.ts
-import { ClaudeProvider } from "./providers/claude.provider"
+import { GeminiProvider } from "./providers/gemini.provider"
 import type { AIProvider } from "./types"
 
+let cachedProvider: AIProvider | null = null
+
 export function getAIProvider(): AIProvider {
-  const provider = process.env.AI_PROVIDER || "claude"
+  if (cachedProvider) return cachedProvider
+
+  const provider = process.env.AI_PROVIDER || "gemini"
 
   switch (provider) {
-    case "claude":
-      return new ClaudeProvider()
+    case "gemini":
+      cachedProvider = new GeminiProvider()
+      break
+    // case "claude":
+    //   cachedProvider = new ClaudeProvider()
+    //   break
     // case "openai":
-    //   return new OpenAIProvider()
-    // case "gemini":
-    //   return new GeminiProvider()
+    //   cachedProvider = new OpenAIProvider()
+    //   break
     default:
       throw new Error(`Unknown AI provider: ${provider}`)
   }
+
+  return cachedProvider
 }
 ```
+
+> **Why singleton?** Each provider initializes an SDK client. Creating a new instance per request wastes connections and memory. Cache it once.
 
 - [ ] Create `src/server/ai/prompts/` — store prompt templates separately from provider logic:
   - `item-analysis.ts` — the system/user prompt for wardrobe item recognition
   - `outfit-suggestion.ts` — the prompt for generating outfit pairings
   - `style-advice.ts` — the prompt for general style Q&A
   - Prompts are **provider-agnostic** plain strings. Each provider formats them into its own API shape.
-- [ ] Add `AI_PROVIDER=claude` to `.env.example`
+- [ ] Add `AI_PROVIDER=gemini` to `.env.example`
 - [ ] Add Zod schemas for `ItemAnalysisResult` and `OutfitSuggestion` in `src/shared/schemas/ai.schema.ts` — used to validate AI responses regardless of provider
 
 **Key rules for the adapter:**
 
 1. **Services never import a provider directly** — they call `getAIProvider()` and use the interface
 2. **Prompts live in `prompts/`**, not inside provider files — prompts are reusable across providers
-3. **Each provider handles its own SDK** — Claude uses `@anthropic-ai/sdk`, OpenAI would use `openai`, etc.
+3. **Each provider handles its own SDK** — Gemini uses `@google/generative-ai`, Claude would use `@anthropic-ai/sdk`, etc.
 4. **AI responses are always validated with Zod** — providers return raw results, the service layer validates
+5. **Adding a new provider** = one new file in `providers/` + one new case in `provider.ts` + install its SDK
+
+### 0.5 — Storage Adapter Layer
+
+**Goal:** All image storage operations go through a provider-agnostic interface. Switching from Cloudinary to S3/Supabase Storage should require only a new provider file and an env var change — zero changes to business logic.
+
+- [ ] Create `src/server/storage/types.ts` — define the contracts:
+
+```typescript
+// The result returned after uploading an image
+interface UploadResult {
+  publicUrl: string         // Full public URL to the image
+  thumbnailUrl: string      // Resized/transformed URL (provider handles how)
+  storageKey: string        // Provider-specific identifier (Cloudinary public_id, S3 key, etc.)
+  mimeType: string
+  size: number              // bytes
+}
+
+// Options for generating a signed URL for direct browser upload
+interface SignedUploadOptions {
+  folder?: string           // e.g. "wardrobe/user123"
+  maxFileSize?: number      // bytes
+  allowedTypes?: string[]   // e.g. ["image/jpeg", "image/png", "image/webp"]
+}
+
+interface SignedUploadResult {
+  uploadUrl: string         // The URL the browser POSTs/PUTs to
+  fields?: Record<string, string>  // Additional form fields (S3 presigned POST needs these)
+  publicUrl: string         // Where the file will be accessible after upload
+  storageKey: string        // The key/id assigned to this upload
+}
+
+interface StorageProvider {
+  // Server-side upload (Buffer → provider)
+  upload(file: Buffer, options: {
+    fileName: string
+    mimeType: string
+    folder?: string
+  }): Promise<UploadResult>
+
+  // Generate signed URL for direct browser upload (avoids sending files through your server)
+  getSignedUploadUrl(options: SignedUploadOptions): Promise<SignedUploadResult>
+
+  // Delete an image by its storage key
+  delete(storageKey: string): Promise<void>
+
+  // Get a thumbnail/transformed URL from an existing image
+  getThumbnailUrl(storageKey: string, options: {
+    width: number
+    height: number
+    fit?: "cover" | "contain"
+  }): string
+}
+```
+
+- [ ] Create `src/server/storage/providers/cloudinary.provider.ts` — implements `StorageProvider` using `cloudinary` SDK
+  - `upload`: uses `cloudinary.uploader.upload_stream`
+  - `getSignedUploadUrl`: uses `cloudinary.utils.api_sign_request` for signed direct uploads
+  - `delete`: uses `cloudinary.uploader.destroy`
+  - `getThumbnailUrl`: uses Cloudinary URL transformations (e.g. `c_fill,w_300,h_300`)
+- [ ] Create `src/server/storage/provider.ts` — singleton factory:
+
+```typescript
+import { CloudinaryProvider } from "./providers/cloudinary.provider"
+import type { StorageProvider } from "./types"
+
+let cachedProvider: StorageProvider | null = null
+
+export function getStorageProvider(): StorageProvider {
+  if (cachedProvider) return cachedProvider
+
+  const provider = process.env.STORAGE_PROVIDER || "cloudinary"
+
+  switch (provider) {
+    case "cloudinary":
+      cachedProvider = new CloudinaryProvider()
+      break
+    // case "s3":
+    //   cachedProvider = new S3Provider()
+    //   break
+    // case "supabase":
+    //   cachedProvider = new SupabaseStorageProvider()
+    //   break
+    default:
+      throw new Error(`Unknown storage provider: ${provider}`)
+  }
+
+  return cachedProvider
+}
+```
+
+- [ ] Add `STORAGE_PROVIDER=cloudinary` to `.env.example`
+
+**Key rules for the storage adapter:**
+
+1. **Services never import `cloudinary` directly** — they call `getStorageProvider()` and use the interface
+2. **`storageKey` is the portable identifier** — Cloudinary calls it `public_id`, S3 calls it a key, but your DB stores `storageKey` and the service layer doesn't care which provider assigned it
+3. **Thumbnail generation is provider-specific** — Cloudinary does it via URL transforms (free, instant), S3 would need a Lambda or pre-generated thumbnails. The `getThumbnailUrl` method hides this difference
+4. **Direct browser upload is critical for performance** — users upload images straight to the storage provider, not through your Nitro server. The `getSignedUploadUrl` method provides the signed URL for this
 5. **Adding a new provider** = one new file in `providers/` + one new case in `provider.ts` + install its SDK
 
 ---
@@ -260,8 +389,8 @@ export function getAIProvider(): AIProvider {
 
 ### 1.1 — Better Auth Setup
 
-- [ ] Install Better Auth: `npm install better-auth`
 - [ ] Create `src/server/auth.ts` — configure Better Auth with MongoDB adapter
+  > Better Auth was already installed in Phase 0.1. It creates its own `user`, `session`, and `account` collections in MongoDB. Do NOT create a separate User Mongoose model for auth fields. Instead, extend Better Auth's user with app-specific fields (like `onboardingComplete`) via Better Auth's `additionalFields` config.
 - [ ] Set up email/password authentication
 - [ ] Create `src/lib/auth-client.ts` — client-side auth helpers
 - [ ] Add auth middleware to protect routes
@@ -279,7 +408,9 @@ export function getAIProvider(): AIProvider {
 - [ ] Create authenticated layout route `src/routes/_authenticated.tsx`
   - This is a TanStack Router layout route — all child routes require auth
   - Use `beforeLoad` to check session, redirect to `/login` if not authenticated
+  - **Must render `<Outlet />` from `@tanstack/react-router`** for nested routes to appear
 - [ ] Create public layout route `src/routes/_public.tsx` for login/signup pages
+  - Also needs `<Outlet />`
 - [ ] Test the full auth flow end-to-end
 
 ### 1.4 — OAuth (Optional, do later if needed)
@@ -365,32 +496,40 @@ Create the route files (empty placeholder components for now):
 
 **Goal:** Users can upload wardrobe items, AI recognizes them, and items are organized.
 
-### 4.1 — Image Upload
+### 4.1 — Image Upload (via Storage Adapter)
 
-- [ ] Install Cloudinary SDK: `npm install cloudinary`
-- [ ] Create `src/server/services/cloudinary.service.ts` — upload, delete, transform images
-- [ ] Create server function `getUploadSignature` — generates a signed Cloudinary upload URL (direct browser upload)
+- [ ] Install the default provider SDK: `npm install cloudinary`
+- [ ] Implement `CloudinaryProvider` from Phase 0.5 (if not already done)
+- [ ] Create server function `getUploadSignature`:
+  - Calls `getStorageProvider().getSignedUploadUrl({ folder: "wardrobe/<userId>" })`
+  - Returns the signed URL + fields to the client
+  - **Never imports `cloudinary` directly** — only uses the `StorageProvider` interface
 - [ ] Create `src/components/common/image-upload.tsx` — drag-and-drop / click-to-upload component
+  - Fetches signed URL from server, uploads directly to storage provider
   - Shows upload progress
   - Preview before confirming
   - Supports multiple files
+- [ ] Create server function `deleteWardrobeItemImage`:
+  - Calls `getStorageProvider().delete(storageKey)`
+  - Used when deleting a wardrobe item
 
 ### 4.2 — AI Item Recognition (via Adapter)
 
-- [ ] Install the default provider SDK: `npm install @anthropic-ai/sdk`
-- [ ] Implement `analyzeWardrobeItem` in `ClaudeProvider` (from Phase 0.4):
+- [ ] Install the default provider SDK: `npm install @google/generative-ai`
+- [ ] Implement `analyzeWardrobeItem` in `GeminiProvider` (from Phase 0.4):
   - Uses the prompt template from `src/server/ai/prompts/item-analysis.ts`
-  - Sends image URL to Claude Vision API
+  - Sends image to Gemini Vision API (Gemini accepts both URLs and inline base64 — the provider handles conversion from `ImageInput`)
   - Returns raw `ItemAnalysisResult`
 - [ ] Create `src/server/services/wardrobe.service.ts` — business logic layer:
   - Calls `getAIProvider().analyzeWardrobeItem(imageUrl)`
   - Validates response with Zod `ItemAnalysisResultSchema`
   - Maps result to a WardrobeItem document
-  - **Never imports Claude SDK directly** — only uses the `AIVisionProvider` interface
+  - **Never imports Gemini SDK directly** — only uses the `AIVisionProvider` interface
 - [ ] Create server function `uploadWardrobeItem`:
-  1. Receive image URL from Cloudinary
-  2. Call `wardrobeService.analyzeAndSave(imageUrl)`
-  3. Return the created item
+  1. Receive `publicUrl` and `storageKey` from the client (returned by the storage provider after direct upload)
+  2. Generate `thumbnailUrl` via `getStorageProvider().getThumbnailUrl(storageKey, { width: 300, height: 300 })`
+  3. Call `wardrobeService.analyzeAndSave(publicUrl, thumbnailUrl, storageKey)`
+  4. Return the created item
 - [ ] Write the item-analysis prompt template — be specific about the JSON structure you want back, include examples of good responses
 
 ### 4.3 — Wardrobe Grid View
@@ -439,7 +578,7 @@ Create the route files (empty placeholder components for now):
     4. Validate response with Zod `OutfitSuggestionSchema`
     5. Map validated suggestions to Outfit documents, save to DB
     6. **Never imports any AI SDK directly**
-- [ ] Implement `generateOutfitSuggestions` in `ClaudeProvider`:
+- [ ] Implement `generateOutfitSuggestions` in `GeminiProvider`:
   - Uses prompt template from `src/server/ai/prompts/outfit-suggestion.ts`
   - Passes wardrobe items + style profile as structured context
   - Returns raw `OutfitSuggestion[]`
@@ -514,66 +653,29 @@ Create the route files (empty placeholder components for now):
 
 ### 6.4 — Landing Page
 
-- [ ] Create `src/routes/index.tsx` — public landing page
+- [ ] Rework `src/routes/index.tsx` into a public landing page (this file already exists — replace its contents)
   - Hero section with value proposition
   - Feature highlights (AI wardrobe, style suggestions, etc.)
   - How it works (3 steps)
   - CTA to sign up
+  - **Gotcha:** If the user is already logged in and visits `/`, redirect them to `/dashboard` via `beforeLoad`
 - [ ] Make it visually appealing — this is the first impression
 
 ---
 
-## Phase 7 — Payments & Subscriptions
-
-**Goal:** Monetize with a freemium model.
-
-### 7.1 — Plan Structure
-
-Define tiers:
-
-| Feature              | Free       | Pro ($9/mo)      |
-| -------------------- | ---------- | ---------------- |
-| Wardrobe items       | 20         | Unlimited        |
-| Outfit suggestions   | 3/month    | Unlimited        |
-| AI item recognition  | 20         | Unlimited        |
-| Style profile        | Yes        | Yes              |
-| Priority AI          | No         | Yes              |
-
-### 7.2 — Stripe Integration
-
-- [ ] Install: `npm install stripe`
-- [ ] Create `src/server/services/stripe.service.ts`
-- [ ] Set up Stripe products and prices in Stripe Dashboard
-- [ ] Create server function `createCheckoutSession` — redirects to Stripe Checkout
-- [ ] Create server function `createBillingPortal` — for managing subscription
-- [ ] Set up Stripe webhook endpoint to handle:
-  - `checkout.session.completed` — activate subscription
-  - `customer.subscription.updated` — plan changes
-  - `customer.subscription.deleted` — cancellation
-- [ ] Create `src/routes/_authenticated/settings.tsx` — billing section with current plan, upgrade/downgrade buttons
-
-### 7.3 — Enforce Limits
-
-- [ ] Create middleware/helper to check usage limits before:
-  - Uploading items (check item count)
-  - Generating outfits (check monthly generation count)
-- [ ] Show upgrade prompts when limits are reached
-
----
-
-## Phase 8 — Deployment
+## Phase 7 — Deployment
 
 **Goal:** Ship it.
 
-### 8.1 — Pre-Deployment
+### 7.1 — Pre-Deployment
 
 - [ ] Audit all environment variables are set
 - [ ] Set up MongoDB Atlas production cluster (or use free tier to start)
-- [ ] Set up Cloudinary production environment
+- [ ] Set up Cloudinary production environment (or whichever storage provider is active)
 - [ ] Review security: CORS, rate limiting, input validation
-- [ ] Add basic rate limiting on AI endpoints (prevent abuse)
+- [ ] Add basic rate limiting on AI endpoints (prevent abuse — Gemini free tier has its own rate limits too)
 
-### 8.2 — Deploy
+### 7.2 — Deploy
 
 - [ ] Deploy to Vercel or Railway:
   - Vercel: `npm install @tanstack/start-vite-plugin` preset works out of the box
@@ -582,7 +684,7 @@ Define tiers:
 - [ ] Set up custom domain
 - [ ] Test full flow on production
 
-### 8.3 — Monitoring
+### 7.3 — Monitoring
 
 - [ ] Add error tracking (Sentry free tier)
 - [ ] Monitor MongoDB Atlas metrics
@@ -600,11 +702,10 @@ Phase 3  →  Onboarding & style profile                 (3-4 days)
 Phase 4  →  Wardrobe upload + AI recognition           (4-5 days)
 Phase 5  →  AI outfit suggestions                      (4-5 days)
 Phase 6  →  Polish, responsive, dark mode, landing     (3-4 days)
-Phase 7  →  Payments (can skip for MVP launch)         (2-3 days)
-Phase 8  →  Deployment                                 (1-2 days)
+Phase 7  →  Deployment                                 (1-2 days)
 ```
 
-**MVP = Phases 0–5** — a working app where users can sign up, build a style profile, upload wardrobe items with AI recognition, and get AI outfit suggestions.
+**MVP = Phases 0–5** — a working app where users can sign up, build a style profile, upload wardrobe items with AI recognition, and get AI outfit suggestions. The platform is free — no payment integration needed.
 
 ---
 
@@ -613,7 +714,7 @@ Phase 8  →  Deployment                                 (1-2 days)
 1. **Build vertically, not horizontally** — finish one feature end-to-end (DB → server → UI) before starting the next
 2. **Server functions are your API** — TanStack Start server functions replace the need for a separate API. Use them for all data mutations and queries
 3. **Validate everywhere** — use Zod schemas shared between client and server. Never trust client input
-4. **AI goes through the adapter** — services call `getAIProvider()`, never import `@anthropic-ai/sdk` or any SDK directly. Prompts live in `prompts/`, not in provider files. This is a hard rule — it makes switching providers a 1-file change
+4. **All external services go through adapters** — AI calls use `getAIProvider()`, storage calls use `getStorageProvider()`. Never import `@google/generative-ai`, `cloudinary`, or any provider SDK in service/route files. This makes switching providers a 1-file change
 5. **AI prompts are your product** — spend time crafting and iterating on prompt templates. The quality of item recognition and outfit suggestions IS the product
 6. **Start ugly, make it pretty** — get functionality working first, then polish. Don't spend a day on a button animation before the upload flow works
 7. **Commit often** — small, working commits. One feature per PR if possible
