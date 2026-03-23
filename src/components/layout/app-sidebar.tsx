@@ -1,4 +1,5 @@
-import { Link, useMatchRoute } from "@tanstack/react-router"
+import { Link, useMatchRoute, useRouter } from "@tanstack/react-router"
+import { useEffect } from "react"
 import {
   LayoutDashboard,
   Shirt,
@@ -18,6 +19,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar"
 
 const NAV_ITEMS = [
@@ -34,6 +36,15 @@ interface AppSidebarProps {
 
 export function AppSidebar({ user }: AppSidebarProps) {
   const matchRoute = useMatchRoute()
+  const router = useRouter()
+  const { isMobile, setOpenMobile } = useSidebar()
+
+  // Close mobile sidebar on navigation
+  useEffect(() => {
+    return router.subscribe("onBeforeNavigate", () => {
+      if (isMobile) setOpenMobile(false)
+    })
+  }, [router, isMobile, setOpenMobile])
 
   function getInitials(name: string) {
     return name
