@@ -15,30 +15,22 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 
+import { getWardrobeStats } from "@/server/functions/wardrobe"
+import { getStyleProfile } from "@/server/functions/stylist"
+
 export const Route = createFileRoute("/_authenticated/dashboard")({
+  loader: async () => {
+    const [stats, profile] = await Promise.all([
+      getWardrobeStats() as Promise<{ itemCount: number }>,
+      getStyleProfile() as Promise<{
+        traits: Record<string, string>
+        summary: string
+      } | null>,
+    ])
+    return { wardrobeCount: stats.itemCount, hasProfile: !!profile?.summary }
+  },
   component: Dashboard,
 })
-
-const STATS = [
-  {
-    label: "Wardrobe Items",
-    value: "0",
-    description: "Upload your first item",
-    icon: Shirt,
-  },
-  {
-    label: "Outfits",
-    value: "0",
-    description: "Get AI suggestions",
-    icon: Sparkles,
-  },
-  {
-    label: "Style Profile",
-    value: "Not set up",
-    description: "Chat with your stylist",
-    icon: User,
-  },
-] as const
 
 const QUICK_ACTIONS = [
   {
@@ -63,6 +55,31 @@ const QUICK_ACTIONS = [
 
 function Dashboard() {
   const { user } = Route.useRouteContext()
+  const { wardrobeCount, hasProfile } = Route.useLoaderData()
+
+  const stats = [
+    {
+      label: "Wardrobe Items",
+      value: String(wardrobeCount),
+      description:
+        wardrobeCount === 0 ? "Upload your first item" : "Items in your closet",
+      icon: Shirt,
+    },
+    {
+      label: "Outfits",
+      value: "0",
+      description: "Get AI suggestions",
+      icon: Sparkles,
+    },
+    {
+      label: "Style Profile",
+      value: hasProfile ? "Active" : "Not set up",
+      description: hasProfile
+        ? "Your profile is ready"
+        : "Chat with your stylist",
+      icon: User,
+    },
+  ]
 
   return (
     <div className="space-y-6">
@@ -74,7 +91,7 @@ function Dashboard() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {STATS.map((stat) => (
+        {stats.map((stat) => (
           <Card key={stat.label}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">

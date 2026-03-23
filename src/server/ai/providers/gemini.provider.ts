@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai"
 import { getStylistSystemPrompt } from "../prompts/stylist-conversation"
+import { ITEM_ANALYSIS_PROMPT } from "../prompts/item-analysis"
 import type {
   AIProvider,
   ImageInput,
@@ -89,7 +90,32 @@ export class GeminiProvider implements AIProvider {
     return parts.join("\n")
   }
 
-  async analyzeWardrobeItem(_image: ImageInput): Promise<ItemAnalysisResult> {
-    throw new Error("analyzeWardrobeItem not implemented  - coming in Phase 4")
+  async analyzeWardrobeItem(image: ImageInput): Promise<ItemAnalysisResult> {
+    const response = await this.ai.models.generateContent({
+      model: MODEL,
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: "Analyze this clothing item:" },
+            {
+              fileData: {
+                fileUri: image.url,
+                mimeType: "image/jpeg",
+              },
+            },
+          ],
+        },
+      ],
+      config: {
+        systemInstruction: ITEM_ANALYSIS_PROMPT,
+        responseMimeType: "application/json",
+        temperature: 0.3,
+        maxOutputTokens: 2048,
+      },
+    })
+
+    const text = response.text ?? ""
+    return JSON.parse(text) as ItemAnalysisResult
   }
 }

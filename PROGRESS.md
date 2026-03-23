@@ -12,7 +12,7 @@
 | 1     | Authentication              | Done (no OAuth) |
 | 2     | App Shell & Navigation      | Done           |
 | 3     | Stylist Onboarding          | Done (core)    |
-| 4     | Outfit Suggestions & Premium| Not Started    |
+| 4     | Wardrobe Management         | Done (no bulk) |
 
 ---
 
@@ -145,8 +145,40 @@
 - [x] Basic: pass current profile as context to AI
 - [ ] Full implementation deferred — needs multiple sessions to test
 
-## Phase 4 — Outfit Suggestions & Premium
-> Not started. See ROADMAP.md for details.
+## Phase 4 - Wardrobe Management
+
+### 0.5 - Storage Adapter Layer (prerequisite)
+- [x] Create `src/server/storage/types.ts` - storage provider interfaces
+- [x] Create `src/server/storage/provider.ts` - provider factory
+- [x] Create `src/server/storage/providers/cloudinary.provider.ts` - Cloudinary implementation
+
+### 4.1 - Image Upload
+- [x] Install `cloudinary` SDK
+- [x] Signed direct-upload from browser to Cloudinary (`ai-stylist/wardrobe/{userId}/` folder)
+- [x] Upload dialog with drag-and-drop, preview, progress
+
+### 4.2 - AI Item Recognition
+- [x] Create `src/server/ai/prompts/item-analysis.ts` - vision prompt
+- [x] Implement `analyzeWardrobeItem` in Gemini provider
+- [x] Implement `analyzeWardrobeItem` in OpenAI provider
+- [x] Create `src/server/models/wardrobe-item.model.ts` - WardrobeItem model
+- [x] Create `src/server/services/wardrobe.service.ts` - wardrobe business logic
+- [x] Create `src/server/functions/wardrobe.ts` - server functions
+
+### 4.3 - Wardrobe Grid View
+- [x] Create `src/components/wardrobe/item-card.tsx` - thumbnail card
+- [x] Create `src/components/wardrobe/item-filters.tsx` - category filter tabs
+- [x] Update `src/routes/_authenticated/wardrobe/index.tsx` - responsive grid with filters
+
+### 4.4 - Item Detail View
+- [x] Update `src/routes/_authenticated/wardrobe/$itemId.tsx` - full metadata, edit, delete, favorite
+
+### 4.5 - Bulk Upload
+- [ ] Deferred - single upload works, bulk upload added later
+
+### Dashboard Integration
+- [x] Wire up wardrobe item count on dashboard stats card
+- [x] Wire up style profile status on dashboard
 
 ---
 

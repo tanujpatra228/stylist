@@ -1,5 +1,6 @@
 import OpenAI from "openai"
 import { getStylistSystemPrompt } from "../prompts/stylist-conversation"
+import { ITEM_ANALYSIS_PROMPT } from "../prompts/item-analysis"
 import type {
   AIProvider,
   ImageInput,
@@ -92,7 +93,24 @@ export class OpenAIProvider implements AIProvider {
     return parts.join("\n")
   }
 
-  async analyzeWardrobeItem(_image: ImageInput): Promise<ItemAnalysisResult> {
-    throw new Error("analyzeWardrobeItem not implemented  - coming in Phase 4")
+  async analyzeWardrobeItem(image: ImageInput): Promise<ItemAnalysisResult> {
+    const response = await this.client.chat.completions.create({
+      model: MODEL,
+      messages: [
+        { role: "system", content: ITEM_ANALYSIS_PROMPT },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Analyze this clothing item:" },
+            { type: "image_url", image_url: { url: image.url } },
+          ],
+        },
+      ],
+      response_format: { type: "json_object" },
+      max_completion_tokens: 2048,
+    })
+
+    const text = response.choices[0]?.message?.content ?? ""
+    return JSON.parse(text) as ItemAnalysisResult
   }
 }
