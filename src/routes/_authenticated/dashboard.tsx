@@ -16,18 +16,24 @@ import {
 } from "@/components/ui/card"
 
 import { getWardrobeStats } from "@/server/functions/wardrobe"
+import { getOutfitStats } from "@/server/functions/outfit"
 import { getStyleProfile } from "@/server/functions/stylist"
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   loader: async () => {
-    const [stats, profile] = await Promise.all([
+    const [wardrobeStats, outfitStats, profile] = await Promise.all([
       getWardrobeStats() as Promise<{ itemCount: number }>,
+      getOutfitStats() as Promise<{ outfitCount: number }>,
       getStyleProfile() as Promise<{
         traits: Record<string, string>
         summary: string
       } | null>,
     ])
-    return { wardrobeCount: stats.itemCount, hasProfile: !!profile?.summary }
+    return {
+      wardrobeCount: wardrobeStats.itemCount,
+      outfitCount: outfitStats.outfitCount,
+      hasProfile: !!profile?.summary,
+    }
   },
   component: Dashboard,
 })
@@ -55,7 +61,7 @@ const QUICK_ACTIONS = [
 
 function Dashboard() {
   const { user } = Route.useRouteContext()
-  const { wardrobeCount, hasProfile } = Route.useLoaderData()
+  const { wardrobeCount, outfitCount, hasProfile } = Route.useLoaderData()
 
   const stats = [
     {
@@ -67,8 +73,9 @@ function Dashboard() {
     },
     {
       label: "Outfits",
-      value: "0",
-      description: "Get AI suggestions",
+      value: String(outfitCount),
+      description:
+        outfitCount === 0 ? "Generate your first outfit" : "AI-generated outfits",
       icon: Sparkles,
     },
     {

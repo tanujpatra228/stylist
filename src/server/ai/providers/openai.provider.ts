@@ -1,12 +1,20 @@
 import OpenAI from "openai"
 import { getStylistSystemPrompt } from "../prompts/stylist-conversation"
 import { ITEM_ANALYSIS_PROMPT } from "../prompts/item-analysis"
+import {
+  OUTFIT_SUGGESTION_SYSTEM_PROMPT,
+  buildOutfitSuggestionPrompt,
+} from "../prompts/outfit-suggestion"
 import type {
   AIProvider,
   ImageInput,
   ItemAnalysisResult,
+  OutfitSuggestion,
+  StyleProfileSummary,
   StylistConverseContext,
   StylistTurnResponse,
+  SuggestionOptions,
+  WardrobeItemSummary,
 } from "../types"
 
 const MODEL = "gpt-5-nano"
@@ -91,6 +99,32 @@ export class OpenAIProvider implements AIProvider {
     parts.push("Please start the conversation with your first question.")
 
     return parts.join("\n")
+  }
+
+  async generateOutfitSuggestions(
+    wardrobeItems: WardrobeItemSummary[],
+    styleProfile: StyleProfileSummary,
+    options: SuggestionOptions
+  ): Promise<OutfitSuggestion[]> {
+    const userPrompt = buildOutfitSuggestionPrompt(
+      wardrobeItems,
+      styleProfile,
+      options
+    )
+
+    const response = await this.client.chat.completions.create({
+      model: MODEL,
+      messages: [
+        { role: "system", content: OUTFIT_SUGGESTION_SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      max_completion_tokens: 4096,
+    })
+
+    const text = response.choices[0]?.message?.content ?? ""
+    const parsed = JSON.parse(text)
+    return parsed.suggestions as OutfitSuggestion[]
   }
 
   async analyzeWardrobeItem(image: ImageInput): Promise<ItemAnalysisResult> {

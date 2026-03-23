@@ -1,6 +1,14 @@
 import { GeminiProvider } from "./providers/gemini.provider"
 import { OpenAIProvider } from "./providers/openai.provider"
-import type { AIProvider, StylistConverseContext, StylistTurnResponse } from "./types"
+import type {
+  AIProvider,
+  OutfitSuggestion,
+  StyleProfileSummary,
+  StylistConverseContext,
+  StylistTurnResponse,
+  SuggestionOptions,
+  WardrobeItemSummary,
+} from "./types"
 
 function createProvider(name: string): AIProvider {
   switch (name) {
@@ -33,6 +41,32 @@ class FallbackAIProvider implements AIProvider {
           `[AI] Primary provider rate limited, falling back to secondary`
         )
         return await this.fallback.stylistConverse(context)
+      }
+      throw error
+    }
+  }
+
+  async generateOutfitSuggestions(
+    wardrobeItems: WardrobeItemSummary[],
+    styleProfile: StyleProfileSummary,
+    options: SuggestionOptions
+  ): Promise<OutfitSuggestion[]> {
+    try {
+      return await this.primary.generateOutfitSuggestions(
+        wardrobeItems,
+        styleProfile,
+        options
+      )
+    } catch (error: unknown) {
+      if (this.fallback && this.isRateLimitError(error)) {
+        console.warn(
+          `[AI] Primary provider rate limited, falling back to secondary`
+        )
+        return await this.fallback.generateOutfitSuggestions(
+          wardrobeItems,
+          styleProfile,
+          options
+        )
       }
       throw error
     }

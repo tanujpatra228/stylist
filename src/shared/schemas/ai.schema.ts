@@ -53,7 +53,25 @@ export const itemAnalysisResultSchema = z.object({
   confidence: z.number(),
 })
 
+export const outfitSuggestionSchema = z.object({
+  name: z.string(),
+  items: z.array(
+    z.object({
+      itemId: z.string(),
+      role: z.string(),
+    })
+  ),
+  occasion: z.string(),
+  season: z.string(),
+  reasoning: z.string(),
+})
+
+export const outfitSuggestionsResponseSchema = z.object({
+  suggestions: z.array(outfitSuggestionSchema),
+})
+
 export type UiHintsInput = z.infer<typeof uiHintsSchema>
 export type StylistTurnResponseInput = z.infer<typeof stylistTurnResponseSchema>
 export type StylistMessageInput = z.infer<typeof stylistMessageSchema>
 export type ItemAnalysisResultInput = z.infer<typeof itemAnalysisResultSchema>
+export type OutfitSuggestionInput = z.infer<typeof outfitSuggestionSchema>

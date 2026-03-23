@@ -1,12 +1,20 @@
 import { GoogleGenAI } from "@google/genai"
 import { getStylistSystemPrompt } from "../prompts/stylist-conversation"
 import { ITEM_ANALYSIS_PROMPT } from "../prompts/item-analysis"
+import {
+  OUTFIT_SUGGESTION_SYSTEM_PROMPT,
+  buildOutfitSuggestionPrompt,
+} from "../prompts/outfit-suggestion"
 import type {
   AIProvider,
   ImageInput,
   ItemAnalysisResult,
+  OutfitSuggestion,
+  StyleProfileSummary,
   StylistConverseContext,
   StylistTurnResponse,
+  SuggestionOptions,
+  WardrobeItemSummary,
 } from "../types"
 
 const MODEL = "gemini-2.5-flash"
@@ -88,6 +96,33 @@ export class GeminiProvider implements AIProvider {
     parts.push("Please start the conversation with your first question.")
 
     return parts.join("\n")
+  }
+
+  async generateOutfitSuggestions(
+    wardrobeItems: WardrobeItemSummary[],
+    styleProfile: StyleProfileSummary,
+    options: SuggestionOptions
+  ): Promise<OutfitSuggestion[]> {
+    const userPrompt = buildOutfitSuggestionPrompt(
+      wardrobeItems,
+      styleProfile,
+      options
+    )
+
+    const response = await this.ai.models.generateContent({
+      model: MODEL,
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      config: {
+        systemInstruction: OUTFIT_SUGGESTION_SYSTEM_PROMPT,
+        responseMimeType: "application/json",
+        temperature: 0.7,
+        maxOutputTokens: 4096,
+      },
+    })
+
+    const text = response.text ?? ""
+    const parsed = JSON.parse(text)
+    return parsed.suggestions as OutfitSuggestion[]
   }
 
   async analyzeWardrobeItem(image: ImageInput): Promise<ItemAnalysisResult> {

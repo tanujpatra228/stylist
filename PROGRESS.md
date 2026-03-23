@@ -145,6 +145,10 @@
 - [x] Basic: pass current profile as context to AI
 - [ ] Full implementation deferred — needs multiple sessions to test
 
+| 5     | AI Outfit Suggestions       | Done (core)    |
+
+---
+
 ## Phase 4 - Wardrobe Management
 
 ### 0.5 - Storage Adapter Layer (prerequisite)
@@ -179,6 +183,36 @@
 ### Dashboard Integration
 - [x] Wire up wardrobe item count on dashboard stats card
 - [x] Wire up style profile status on dashboard
+
+---
+
+## Phase 5 - AI Outfit Suggestions
+
+### 5.1 - Outfit Generation Service
+- [x] Add WardrobeItemSummary, StyleProfileSummary, SuggestionOptions types
+- [x] Create `src/server/models/outfit.model.ts` - Outfit Mongoose model
+- [x] Add outfitSuggestionSchema to Zod schemas
+- [x] Create `src/server/ai/prompts/outfit-suggestion.ts` - generation prompt
+- [x] Implement generateOutfitSuggestions in Gemini provider
+- [x] Implement generateOutfitSuggestions in OpenAI provider
+- [x] Add generateOutfitSuggestions to FallbackAIProvider
+- [x] Create `src/server/services/outfit.service.ts` - outfit business logic
+- [x] Create `src/server/functions/outfit.ts` - server functions
+
+### 5.2 - Outfit Suggestion UI
+- [x] Install shadcn select component
+- [x] Create `src/components/outfits/generation-dialog.tsx` - generation form
+- [x] Create `src/components/outfits/outfit-card.tsx` - outfit card with item thumbnails
+
+### 5.3 - Outfit Detail View
+- [x] Update `src/routes/_authenticated/outfits/index.tsx` - outfits grid
+- [x] Update `src/routes/_authenticated/outfits/$outfitId.tsx` - detail with rate, save, worn, delete
+
+### 5.4 - Smart Suggestions
+- [ ] Deferred - daily suggestions, weather API, "Surprise me"
+
+### Dashboard Integration
+- [x] Wire up outfit count on dashboard stats card
 
 ---
 
