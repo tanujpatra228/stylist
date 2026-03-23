@@ -4,13 +4,18 @@ import { getAuth } from "../auth"
 import * as stylistService from "../services/stylist.service"
 import type { SessionType } from "../ai/types"
 
-async function getAuthenticatedUserId(): Promise<string> {
+async function getAuthenticatedSession() {
   const auth = await getAuth()
   const headers = getRequestHeaders()
   const session = await auth.api.getSession({
     headers: headers as unknown as Headers,
   })
   if (!session) throw new Error("Unauthorized")
+  return { auth, session }
+}
+
+async function getAuthenticatedUserId(): Promise<string> {
+  const { session } = await getAuthenticatedSession()
   return session.user.id
 }
 
@@ -34,6 +39,20 @@ export const resumeStylistSession = createServerFn({ method: "GET" })
     await getAuthenticatedUserId()
     return stylistService.resumeSession(data.sessionId)
   })
+
+export const completeOnboarding = createServerFn({ method: "POST" }).handler(
+  async () => {
+    const userId = await getAuthenticatedUserId()
+    const { ObjectId } = await import("mongodb")
+    const { connectToDatabase } = await import("../db")
+    const { db } = await connectToDatabase()
+    await db.collection("user").updateOne(
+      { _id: new ObjectId(userId) },
+      { $set: { onboardingComplete: true } }
+    )
+    return { success: true }
+  }
+)
 
 export const getStyleProfile = createServerFn({ method: "GET" }).handler(
   async () => {

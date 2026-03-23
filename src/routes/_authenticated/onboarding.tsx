@@ -14,6 +14,7 @@ import { StylistChat } from "@/components/stylist/stylist-chat"
 import {
   startStylistSession,
   sendStylistMessage,
+  completeOnboarding,
 } from "@/server/functions/stylist"
 import type { StylistTurnResponse, UiHints } from "@/server/ai/types"
 
@@ -202,7 +203,14 @@ function OnboardingPage() {
           </CardContent>
           <CardFooter>
             <Button
-              onClick={() => navigate({ to: "/dashboard" })}
+              onClick={async () => {
+                try {
+                  await completeOnboarding()
+                  navigate({ to: "/dashboard" })
+                } catch {
+                  toast.error("Something went wrong. Please try again.")
+                }
+              }}
               className="w-full"
               size="lg"
             >

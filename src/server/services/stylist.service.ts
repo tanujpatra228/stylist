@@ -122,20 +122,37 @@ export async function respondToStylist(
     maxTurns,
   })
 
-  const validated = sanitizeResponse(stylistTurnResponseSchema.parse(aiResponse))
+  let validated = sanitizeResponse(stylistTurnResponseSchema.parse(aiResponse))
+
+  // Force session complete if we've hit or exceeded the turn limit
+  const isOverLimit = userTurns >= maxTurns
+  if (isOverLimit && !validated.sessionComplete) {
+    validated = {
+      ...validated,
+      sessionComplete: true,
+      uiHints: { inputType: "text" },
+      updatedSummary:
+        validated.updatedSummary ||
+        `Based on our conversation: ${Object.entries(currentTraits)
+          .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+          .join(". ")}`,
+    }
+  }
 
   // Merge extracted data into profile
   if (validated.extractedData && profile) {
     const updatedTraits = deepMerge(currentTraits, validated.extractedData)
     profile.traits = updatedTraits
     profile.markModified("traits")
-
-    if (validated.sessionComplete && validated.updatedSummary) {
-      profile.summary = validated.updatedSummary
-    }
-
-    await profile.save()
   }
+
+  // Update summary when session completes
+  if (validated.sessionComplete && validated.updatedSummary && profile) {
+    profile.summary = validated.updatedSummary
+    profile.markModified("summary")
+  }
+
+  if (profile) await profile.save()
 
   // Append AI message to session
   session.messages.push({
@@ -146,7 +163,7 @@ export async function respondToStylist(
     timestamp: new Date(),
   })
 
-  // Mark session complete if AI says so
+  // Mark session complete
   if (validated.sessionComplete) {
     session.status = "completed"
   }
