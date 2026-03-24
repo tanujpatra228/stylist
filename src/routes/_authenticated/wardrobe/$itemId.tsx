@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Dialog,
   DialogContent,
@@ -50,7 +51,43 @@ export const Route = createFileRoute("/_authenticated/wardrobe/$itemId")({
     return { item: item as ItemData }
   },
   component: WardrobeItemPage,
+  pendingComponent: WardrobeItemPending,
 })
+
+function WardrobeItemPending() {
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <Skeleton className="size-9 rounded-md" />
+        <Skeleton className="h-7 w-40" />
+      </div>
+
+      {/* Image */}
+      <Skeleton className="aspect-[4/3] w-full rounded-lg" />
+
+      {/* Metadata rows */}
+      <div className="grid grid-cols-2 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="space-y-1">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-4 w-28" />
+          </div>
+        ))}
+      </div>
+
+      {/* Badges area */}
+      <div className="space-y-3">
+        <Skeleton className="h-3 w-16" />
+        <div className="flex gap-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-6 w-14 rounded-full" />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function WardrobeItemPage() {
   const { item } = Route.useLoaderData()

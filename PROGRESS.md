@@ -146,6 +146,7 @@
 - [ ] Full implementation deferred — needs multiple sessions to test
 
 | 5     | AI Outfit Suggestions       | Done (core)    |
+| 6     | Polish & UX                 | Done           |
 
 ---
 
@@ -213,6 +214,31 @@
 
 ### Dashboard Integration
 - [x] Wire up outfit count on dashboard stats card
+
+---
+
+## Phase 6 - Polish & UX
+
+### 6.1 - Responsive Design
+- [x] Mobile-first Tailwind classes throughout (done in earlier phases)
+- [x] Sidebar auto-closes on mobile navigation
+
+### 6.2 - Loading & Error States
+- [x] Skeleton loaders for wardrobe grid, outfit cards, dashboard, profile, item detail
+- [x] Empty states with CTAs for wardrobe, outfits, profile
+- [x] Error boundary component (`src/components/common/route-error.tsx`)
+- [x] Toast notifications on all actions
+
+### 6.3 - Dark Mode
+- [x] ThemeProvider (next-themes) initialized in root layout
+- [x] Theme toggle button in app header
+- [x] Theme preference cards in settings (Light / Dark / System)
+- [x] Persists to localStorage automatically
+
+### 6.4 - Landing Page
+- [x] Public landing page at `/` with hero, features, how-it-works, CTA
+- [x] Authenticated users redirected to dashboard
+- [x] Updated page title to "AI Stylist"
 
 ---
 

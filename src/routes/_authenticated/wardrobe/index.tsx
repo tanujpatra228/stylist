@@ -4,6 +4,7 @@ import { Shirt } from "lucide-react"
 import { getUserWardrobeItems } from "@/server/functions/wardrobe"
 import { UploadDialog } from "@/components/wardrobe/upload-dialog"
 import { ItemCard } from "@/components/wardrobe/item-card"
+import { ItemCardSkeleton } from "@/components/wardrobe/item-card-skeleton"
 import { ItemFilters } from "@/components/wardrobe/item-filters"
 
 interface WardrobeItemData {
@@ -20,7 +21,26 @@ export const Route = createFileRoute("/_authenticated/wardrobe/")({
     return { items: items as WardrobeItemData[] }
   },
   component: WardrobePage,
+  pendingComponent: WardrobePending,
 })
+
+function WardrobePending() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Shirt className="size-6" />
+          <h1 className="text-2xl font-semibold">My Wardrobe</h1>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <ItemCardSkeleton key={i} />
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function WardrobePage() {
   const { items: initialItems } = Route.useLoaderData()

@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
 import { getStyleProfile } from "@/server/functions/stylist"
 
 export const Route = createFileRoute("/_authenticated/profile")({
@@ -17,7 +18,41 @@ export const Route = createFileRoute("/_authenticated/profile")({
     return { profile }
   },
   component: ProfilePage,
+  pendingComponent: ProfilePending,
 })
+
+function ProfilePending() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <Skeleton className="size-6 rounded" />
+        <Skeleton className="h-8 w-36" />
+      </div>
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-40" />
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-5 w-28" />
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-6 w-16 rounded-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
 
 function ProfilePage() {
   const { profile } = Route.useLoaderData()

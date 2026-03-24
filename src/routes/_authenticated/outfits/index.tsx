@@ -3,6 +3,7 @@ import { Sparkles } from "lucide-react"
 import { getUserOutfits } from "@/server/functions/outfit"
 import { GenerationDialog } from "@/components/outfits/generation-dialog"
 import { OutfitCard } from "@/components/outfits/outfit-card"
+import { OutfitCardSkeleton } from "@/components/outfits/outfit-card-skeleton"
 
 interface OutfitItem {
   itemId: string
@@ -28,7 +29,26 @@ export const Route = createFileRoute("/_authenticated/outfits/")({
     return { outfits }
   },
   component: OutfitsPage,
+  pendingComponent: OutfitsPending,
 })
+
+function OutfitsPending() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Sparkles className="size-6" />
+          <h1 className="text-2xl font-semibold">My Outfits</h1>
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <OutfitCardSkeleton key={i} />
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function OutfitsPage() {
   const { outfits } = Route.useLoaderData()
